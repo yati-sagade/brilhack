@@ -4,24 +4,34 @@
 # 2. Find redundant variable assignments within a block and delete them. This
 #    cannot be done as easily globally because of missing runtime control flow
 #    information.
+import logging
 import basic_blocks
 from util import is_value_op
 
 
 def _global_dce(func: basic_blocks.Function) -> basic_blocks.Function:
     optfunc = basic_blocks.Function.filter_copy(func)
+
+    # Perform multiple rounds of removal until there is no removal possible.
     while True:
         candidates = {}
+
+        # Set of variable names that are used in the RHS of any op. Once seen
+        # as used, this var may not be candidate for removal in this round.
+        used = set()
         for block_idx, block in enumerate(optfunc.blocks):
             for instr_idx, instr in enumerate(block):
                 for arg in instr.get('args', []):
+                    used.add(arg)
                     candidates.pop(arg, None)
-                if is_value_op(instr):
+                if is_value_op(instr) and instr['dest'] not in used:
                     candidates[instr['dest']] = (block_idx, instr_idx)
         if not candidates:
             # This means there were no more opportunities, i.e., the optimization
             # has converged.
             return optfunc
+        logging.debug('global dce: removing {} from function {}'.format(
+            candidates, optfunc.name))
         optfunc = basic_blocks.Function.filter_copy(optfunc,
                                                     exclude=set(
                                                         candidates.values()))
@@ -45,6 +55,9 @@ def _local_dce(block):
                 candidates[dst] = idx
         if not remove:
             return optblock
+        remove_vars = [block[idx] for idx in sorted(remove)]
+        logging.debug('local dce: removing {} from block {}'.format(
+            remove_vars, idx))
         optblock = [b for i, b in enumerate(optblock) if i not in remove]
     return optblock
 
@@ -65,8 +78,9 @@ def dead_code_elimination(
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
     import json, sys
     prog = json.load(sys.stdin)
     bbprog = basic_blocks.BBProgram(prog)
     optprog = dead_code_elimination(bbprog)
-    json.dump(optprog)
+    json.dump(optprog.bril_dict(), sys.stdout)

@@ -7,8 +7,12 @@ def is_effect_op(instr):
 
 
 def is_terminator(instr):
-    return instr['op'] in ('jmp', 'br')
+    return instr.get('op') in ('jmp', 'br')
 
 
 def is_label(instr):
     return 'label' in instr
+
+
+def mklabel(label_name):
+    return {"label": label_name}
