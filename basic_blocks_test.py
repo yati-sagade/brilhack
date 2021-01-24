@@ -1,5 +1,5 @@
 import unittest
-from basic_blocks import BBProgram
+from .basic_blocks import BBProgram
 
 
 class BBProgramTest(unittest.TestCase):
@@ -48,6 +48,8 @@ class BBProgramTest(unittest.TestCase):
             "type": "int",
             "value": 2
         }], [{
+            "label": "somewhere"
+        }, {
             "args": ["v"],
             "op": "print"
         }]])

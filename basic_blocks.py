@@ -1,4 +1,4 @@
-from util import is_terminator, is_label, mklabel
+from .util import is_terminator, is_label, mklabel
 
 
 def _make_blocks(instrs):
@@ -94,8 +94,9 @@ class BBProgram:
         self.funcs = {}
         if prog is not None:
             for func in prog['functions']:
+                print(func)
                 self.funcs[func['name']] = Function(name=func['name'],
-                                                    args=func['args'],
+                                                    args=func.get('args', []),
                                                     instrs=func['instrs'])
 
     def bril_dict(self):
