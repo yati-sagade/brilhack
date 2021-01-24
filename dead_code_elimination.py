@@ -5,8 +5,8 @@
 #    cannot be done as easily globally because of missing runtime control flow
 #    information.
 import logging
-import basic_blocks
-from util import is_value_op
+from . import basic_blocks
+from .util import is_value_op
 
 
 def _global_dce(func: basic_blocks.Function) -> basic_blocks.Function:

@@ -1,6 +1,6 @@
 import unittest
-from basic_blocks import BBProgram
-import dead_code_elimination as dce
+from .basic_blocks import BBProgram
+from . import dead_code_elimination as dce
 
 
 class DeadCodeEliminationTest(unittest.TestCase):
@@ -10,6 +10,7 @@ class DeadCodeEliminationTest(unittest.TestCase):
             @main {
               a: int = const 1;
               a: int = const 2;
+              b: int = const 3;
               a: int = add a a;
               b: int = id a;
               print b;
