@@ -1,6 +1,19 @@
-from .basic_blocks import Function
+from .basic_blocks import Function, BBProgram
 from .util import is_value_op
 import logging
+import argparse
+import json
+import sys
+
+ALL_ANALYSES = {}
+
+
+def analysis(name):
+    def decorator(func):
+        ALL_ANALYSES[name] = func
+        return func
+
+    return decorator
 
 
 def solve(func: Function, init, transfer_fn, merge_fn):
@@ -67,6 +80,30 @@ def reaching_defs_merge(vals):
     return merged
 
 
+@analysis("reaching_defs")
 def reaching_defs(func):
     return solve(func, reaching_defs_init(func), reaching_defs_transfer,
                  reaching_defs_merge)
+
+
+def main(args):
+    afunc = ALL_ANALYSES[args.analysis]
+    if args.input is None:
+        prog = json.load(sys.stdin)
+        bbprog = BBProgram(prog)
+        for name, func in bbprog.funcs.items():
+            result = afunc(func)
+            print('Function {}\n----------\n{}\n'.format(result))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Run data flow analyses on bril programs')
+    parser.add_argument(
+        '--input',
+        help="Input bril (JSON) program file. If not given, read from STDIN.")
+    parser.add_argument('--analysis',
+                        help="Name of the analysis to run, one of: {}".format(
+                            ", ".join(sorted(ALL_ANALYSES.keys()))))
+    args = parser.parse_args()
+    main(args)
