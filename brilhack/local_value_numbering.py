@@ -41,6 +41,16 @@ def id_op(valtable, valnum, dest, typ):
     canonical_var = valtable[valnum][1]
     return {'op': 'id', 'dest': dest, 'args': [canonical_var], 'type': typ}
 
+def rename_vars(basic_block):
+    # Map from original var name to its currently active rename.
+    curr = {}
+    for idx, instr in enumerate(basic_block):
+        if util.is_value_op(instr):
+            dest = instr['dest']
+            instr['dest'] = curr[dest] = '{}__{}'.format(instr['dest'], idx)
+        if 'args' in instr:
+            instr['args'] = [curr.get(arg, arg) for arg in instr['args']]
+
 
 def local_value_numbering_transform(basic_block):
     # Each entry valtable[k] is a tuple
@@ -56,13 +66,7 @@ def local_value_numbering_transform(basic_block):
     # Map from a value key to its index into valtable.
     valindex = {}
 
-    # Map from varname to index of instruction where that var was last used as
-    # a dest. This is used for renaming variables that are reassigned later to
-    # preserve SSA form.
-    last_used = {}
-    for i, instr in enumerate(basic_block):
-        if util.is_value_op(instr):
-            last_used[instr['dest']] = i
+    rename_vars(basic_block)
 
     transformed_bb = []
     for idx, instr in enumerate(basic_block):
@@ -77,8 +81,6 @@ def local_value_numbering_transform(basic_block):
         elif util.is_value_op(instr):
             num = len(valtable)
             dest = instr['dest']
-            if idx != last_used[dest]:
-                dest += '__{}'.format(idx)
             valtable.append((key, dest))
             valindex[key] = num
             env[dest] = num
