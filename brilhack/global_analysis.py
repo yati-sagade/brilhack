@@ -186,6 +186,8 @@ def is_cfg_reducible(cfg: List[List[int]]) -> bool:
 
     def on_back_edge(cfg, doms, preds, header, curr):
         nonlocal is_reducible
+        if not is_reducible:
+            return
         try:
             loop = _extract_loop(cfg, doms, preds, header, curr)
         except NotANaturalLoop:
