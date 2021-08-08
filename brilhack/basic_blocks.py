@@ -36,6 +36,12 @@ def _build_cfg(blocks, label_index):
         else:
             next_blocks = [i + 1]
         cfg.append(next_blocks)
+
+    # If the last instr of the last block is not a terminator, we have a dummy
+    # edge to a non-existent block. If this is the case, make sure this dummy
+    # block has an empty adjlist.
+    if cfg and cfg[-1] == [len(blocks)]:
+        cfg.append([])
     return cfg
 
 

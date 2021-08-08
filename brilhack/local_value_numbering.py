@@ -41,6 +41,7 @@ def id_op(valtable, valnum, dest, typ):
     canonical_var = valtable[valnum][1]
     return {'op': 'id', 'dest': dest, 'args': [canonical_var], 'type': typ}
 
+
 def rename_vars(basic_block):
     # Map from original var name to its currently active rename.
     curr = {}
@@ -54,10 +55,14 @@ def rename_vars(basic_block):
 
 def local_value_numbering_transform(basic_block):
     # Each entry valtable[k] is a tuple
+    #
     #   (value_key, canonical_var)
+    #
     # which says that the k^th cached value has a key `value_key`, and was first
     # bound to the variable named by `canonical_var`.
-    # The `value_key` tuple can refer to other entries in this table by index.
+    #
+    # The `value_key` tuple can refer to other entries in this table by index
+    # (it is computed by value_key()).
     valtable = []
 
     # Map from variable name to the index of value it holds in valtable.

@@ -57,8 +57,9 @@ class BBProgramTest(unittest.TestCase):
         # Verify CFG is built correctly.
         # Block 0 jmps to .somewhere (block 2)
         # Block 1 continues to block 2
-        # Block 2 is the last block, so the next block "index" is 3.
-        self.assertEqual(main_func.block_exits, [[2], [2], [3]])
+        # Block 2 is the last block, so the next block "index" is 3, which is
+        # actually a dummy block with no successors.
+        self.assertEqual(main_func.block_exits, [[2], [2], [3], []])
 
 
 if __name__ == '__main__':
