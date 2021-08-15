@@ -16,3 +16,7 @@ def is_label(instr):
 
 def mklabel(label_name):
     return {"label": label_name}
+
+
+def mkjmp(target):
+    return {"op": "jmp", "labels": [target]}

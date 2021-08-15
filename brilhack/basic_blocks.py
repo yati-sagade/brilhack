@@ -1,3 +1,5 @@
+import copy
+
 from .util import is_terminator, is_label, mklabel
 
 
@@ -67,7 +69,10 @@ class Function:
         # Control flow information.
         # Map from block index to a list of block indices where control can
         # reach from it.
-        self.block_exits = _build_cfg(self.blocks, self.label_index)
+        if block_exits is None:
+            self.block_exits = _build_cfg(self.blocks, self.label_index)
+        else:
+            self.block_exits = block_exits
 
     def to_bril(self):
         return {
@@ -83,15 +88,18 @@ class Function:
         f = cls(name=other.name,
                 args=other.args,
                 blocks=[],
-                label_index=other.label_index.copy(),
-                block_exits=other.block_exits)
+                label_index=copy.deepcopy(other.label_index),
+                block_exits=copy.deepcopy(other.block_exits))
         for block_idx, block in enumerate(other.blocks):
             b = []
             for instr_idx, instr in enumerate(block):
-                if not (exclude and (block_idx, instr_idx) in exclude):
-                    b.append(instr)
+                if not exclude or (block_idx, instr_idx) not in exclude:
+                    b.append(copy.deepcopy(instr))
             f.blocks.append(b)
         return f
+
+    def copy(self):
+        return self.__class__.filter_copy(self)
 
 
 class BBProgram:

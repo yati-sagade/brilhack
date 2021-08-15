@@ -1,5 +1,6 @@
 from .basic_blocks import Function, BBProgram
 from .util import is_value_op
+from typing import Dict, List, Tuple
 import logging
 import argparse
 import json
@@ -50,13 +51,19 @@ def solve(func: Function, init, transfer_fn, merge_fn):
     return outvals
 
 
+# Map from variable name to the set of (block_id, instr_id) of instructions
+# that define it. There can be multiple reaching definitions of the same var
+# at a given point in the program due to, e.g., conditional jumps in a CFG.
+ReachingDefsMap = dict[str, set[tuple[int, int]]]
+
+
 # Definitions are maintained as a map {varname: (block_id, instr_id)}
 # For function params, the value is None.
-def reaching_defs_init(func: Function):
+def reaching_defs_init(func: Function) -> ReachingDefsMap:
     return {a["name"]: {None} for a in func.args}
 
 
-def reaching_defs_transfer(func, block_id, inval):
+def reaching_defs_transfer(func, block_id, inval) -> ReachingDefsMap:
     block = func.blocks[block_id]
     outval = inval.copy()
     for i, instr in enumerate(block):
@@ -70,7 +77,7 @@ def reaching_defs_transfer(func, block_id, inval):
     return outval
 
 
-def reaching_defs_merge(vals):
+def reaching_defs_merge(vals) -> ReachingDefsMap:
     merged = {}
     for val in vals:
         for var, defs in val.items():
@@ -81,7 +88,8 @@ def reaching_defs_merge(vals):
 
 
 @analysis("reaching_defs")
-def reaching_defs(func):
+def reaching_defs(func) -> list[ReachingDefsMap]:
+    """Returns the map of reaching variable defs at the end of each block."""
     return solve(func, reaching_defs_init(func), reaching_defs_transfer,
                  reaching_defs_merge)
 

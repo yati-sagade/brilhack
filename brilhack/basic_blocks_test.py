@@ -3,6 +3,38 @@ from .basic_blocks import BBProgram
 
 
 class BBProgramTest(unittest.TestCase):
+    def test_function_copy(self):
+        bbprog = BBProgram({
+            "functions": [{
+                "instrs": [{
+                    "dest": "v",
+                    "op": "const",
+                    "type": "int",
+                    "value": 4
+                }, {
+                    "labels": ["somewhere"],
+                    "op": "jmp"
+                }, {
+                    "dest": "v",
+                    "op": "const",
+                    "type": "int",
+                    "value": 2
+                }, {
+                    "label": "somewhere"
+                }, {
+                    "args": ["v"],
+                    "op": "print"
+                }],
+                "name":
+                "main"
+            }]
+        })
+        main = bbprog.funcs['main']
+        copy = main.copy()
+        self.assertEqual(copy.blocks, main.blocks)
+        self.assertEqual(copy.label_index, main.label_index)
+        self.assertEqual(copy.block_exits, main.block_exits)
+
     def test_bbprogram(self):
         bbprog = BBProgram({
             "functions": [{
