@@ -58,9 +58,10 @@ ReachingDefsMap = dict[str, set[tuple[int, int]]]
 
 
 # Definitions are maintained as a map {varname: (block_id, instr_id)}
-# For function params, the value is None.
+# For function params, the value is (None, param_index), where param_index is
+# the 0-based index of the param.
 def reaching_defs_init(func: Function) -> ReachingDefsMap:
-    return {a["name"]: {None} for a in func.args}
+    return {a["name"]: {(None, i)} for i, a in enumerate(func.args)}
 
 
 def reaching_defs_transfer(func, block_id, inval) -> ReachingDefsMap:

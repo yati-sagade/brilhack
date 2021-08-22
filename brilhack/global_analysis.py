@@ -4,7 +4,8 @@ import logging
 from collections import deque
 
 from .basic_blocks import Function
-from .util import is_value_op, mklabel, mkjmp, is_terminator
+from .util import is_value_op, mklabel, mkjmp, is_terminator, instr_as_string
+from .util import can_have_side_effects
 from .dataflow import ReachingDefsMap, reaching_defs
 
 
@@ -125,8 +126,13 @@ def _extract_loop(cfg: List[List[int]], doms, preds, header, loopback):
 def _dfs_cfg(cfg: List[List[int]],
              on_node_visit=None,
              on_node_process=None,
-             on_back_edge=None):
+             on_back_edge=None,
+             blocks=None):
     """Runs DFS on the given CFG.
+
+    If `blocks` is given it is a list of block IDs, and DFS is run once for each
+    of the block ids in that list. If not given, DFS is attempted on all nodes
+    in the graph.
 
     Calls:
       - on_node_visit(cfg, dominators, predecessors, node) the first time a
@@ -160,7 +166,9 @@ def _dfs_cfg(cfg: List[List[int]],
         if on_node_process is not None:
             on_node_process(cfg, doms, preds, idx)
 
-    for i in range(len(cfg)):
+    if blocks is None:
+        blocks = range(len(cfg))
+    for i in blocks:
         _dfs(i)
 
 
@@ -197,6 +205,19 @@ def is_cfg_reducible(cfg: List[List[int]]) -> bool:
     return is_reducible
 
 
+def _instr(func, block_id, instr_id):
+    if block_id is None:
+        return '{}.params[{}]<>'.format(func.name, instr_id,
+                                        func.args[instr_id]['name'])
+
+    return '{}<{}>'.format((block_id, instr_id),
+                           instr_as_string(func.blocks[block_id][instr_id]))
+
+
+def _instrs(func, block_and_instr_ids):
+    return [_instr(func, b, i) for b, i in block_and_instr_ids]
+
+
 def _get_reaching_def_blocks(block_reaching_defs: Dict[str, Set[Tuple[int,
                                                                       int]]],
                              varname: str) -> Set[int]:
@@ -231,7 +252,12 @@ def _find_invariant_instrs(func: Function, loop: Set[int],
         for block_id in loop:
             block = func.blocks[block_id]
             for instr_id, instr in enumerate(block):
-                if not is_value_op(instr):
+                logging.debug('[LICM] processing instr {}'.format(
+                    _instr(func, block_id, instr_id)))
+                if can_have_side_effects(instr):
+                    logging.debug(
+                        'Skipping possible side-effect-causing instr {}'.
+                        format(_instr(func, block_id, instr_id)))
                     continue
 
                 if (block_id, instr_id) in li_instrs:
@@ -243,8 +269,13 @@ def _find_invariant_instrs(func: Function, loop: Set[int],
                 # - Itself LI.
                 is_loop_invariant = True
                 for argname in instr['args']:
+                    logging.debug('  Processing argument {}'.format(argname))
                     arg_reaching_defs = reaching_defs[block_id][argname]
+                    logging.debug('    Reaching defs: {}'.format(
+                        _instrs(func, reaching_defs[block_id][argname])))
                     in_loop_reaching_defs = {
+                        # func params are handled automatically since
+                        # block_id = None in those cases.
                         (block_id, instr_id)
                         for block_id, instr_id in arg_reaching_defs
                         if block_id in loop
@@ -257,9 +288,13 @@ def _find_invariant_instrs(func: Function, loop: Set[int],
                     if in_loop_reaching_defs and not li_instrs.issuperset(
                             in_loop_reaching_defs):
                         logging.debug(
-                            'Instr {} ({}) NOT LI because all the reaching defs from inside the lop are not LI: {}'
-                            .format((block_id, instr_id), instr,
-                                    in_loop_reaching_defs))
+                            'Instr {} NOT LI because all the reaching defs from inside the loop are not LI: {}'
+                            .format(
+                                _instr(func, block_id, instr_id),
+                                _instrs(
+                                    func,
+                                    in_loop_reaching_defs.difference(
+                                        li_instrs))))
                         is_loop_invariant = False
 
                 if is_loop_invariant:
@@ -272,13 +307,52 @@ def _find_invariant_instrs(func: Function, loop: Set[int],
     ]))
 
     # For an LI instruction to be safe for motion,
-    # - It must dominate all uses in the loop, AND,
-    # - It must be the only definition for that var in the loop, AND,
-    # - The var must be dead in all blocks after the loop exit.
+    # 1. It must dominate all uses in the loop, AND,
+    # 2. It must be the only definition for that var in the loop, AND,
+    # 3. The var must be dead in all blocks after the loop exit, AND,
+    # 4. It must be safe (no side effects/possible exceptions).
+
+    # Find all blocks reachable from each of the loop blocks. ASSUMING
+    # dead-code-elimination has run before this LICM pass, we will not touch
+    # definitions of variables that are used in any block reachable from a
+    # loop block.
+    downstream_blocks = set()
+
+    def _on_node_visit(_f, _d, _p, block_id):
+        if block_id not in loop:
+            downstream_blocks.add(block_id)
+
+    _dfs_cfg(func.block_exits, blocks=loop, on_node_visit=_on_node_visit)
+
+    logging.debug(
+        'Downstream blocks from the loop: {}'.format(downstream_blocks))
+
+    # TODO: The following (defs_used_downstream computation) is really messy, we
+    # should be able to tweak how var_uses is populated above to get rid of the
+    # extra pass.
+    # Variable names that the current set of loop invariant ops define.
+    li_defvars = set(func.blocks[b][i]['dest'] for b, i in li_instrs)
+    defs_used_downstream = set()
+    for block_id in downstream_blocks:
+        if block_id >= len(func.blocks):
+            continue
+        for instr in func.blocks[block_id]:
+            defs_used_downstream.update(
+                li_defvars.intersection(instr.get('args', [])))
+
+    logging.debug('Variables used downstream of the loop: {}'.format(
+        defs_used_downstream))
+
     movable_instrs = set()
     for block_id, instr_id in li_instrs:
         varname = func.blocks[block_id][instr_id]['dest']
         if not var_uses.get((block_id, instr_id, varname)):
+            continue
+
+        if varname in defs_used_downstream:
+            logging.debug(
+                'Variable {} is used downstream of the loop, skipping'.format(
+                    varname))
             continue
 
         is_movable = True
@@ -287,14 +361,11 @@ def _find_invariant_instrs(func: Function, loop: Set[int],
                 logging.debug(
                     'For LI instr {}, the block does not dominate a '
                     'use in block {} of the loop, should skip!'.format(
-                        (block_id, instr_id), using_block_id))
+                        _instr(func, block_id, instr_id), using_block_id))
                 is_movable = False
                 break
 
         if is_movable:
-            # TODO(yati): Need to also check if the L.I. definition is dead
-            # after the loop, else moving it before the loop will cause
-            # incorrect behaviour!!.
             movable_instrs.add((block_id, instr_id))
 
     return movable_instrs

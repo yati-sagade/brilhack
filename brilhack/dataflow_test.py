@@ -40,24 +40,24 @@ class DataFlowTest(unittest.TestCase):
         defs = dataflow.reaching_defs(bbprog.funcs["main"])
         self.assertEqual(defs, [
             {
-                "x": {None},
+                "x": {(None, 0)},
                 "v": {(0, 0)},
                 "incr": {(0, 1)}
             },
             {
-                "x": {None},
+                "x": {(None, 0)},
                 "v": {(0, 0), (2, 2)},
                 "incr": {(0, 1)},
                 "end": {(1, 1)}
             },
             {
-                "x": {None},
+                "x": {(None, 0)},
                 "v": {(2, 2)},
                 "incr": {(0, 1)},
                 "end": {(1, 1)}
             },
             {
-                "x": {None},
+                "x": {(None, 0)},
                 "v": {(0, 0), (2, 2)},
                 "incr": {(0, 1)},
                 "end": {(1, 1)}
@@ -65,31 +65,14 @@ class DataFlowTest(unittest.TestCase):
         ])
 
     def test_reaching_defs(self):
-        bbprog = BBProgram({
-            "functions": [{
-                "instrs": [{
-                    "dest": "v",
-                    "op": "const",
-                    "type": "int",
-                    "value": 4
-                }, {
-                    "labels": ["somewhere"],
-                    "op": "jmp"
-                }, {
-                    "dest": "v",
-                    "op": "const",
-                    "type": "int",
-                    "value": 2
-                }, {
-                    "label": "somewhere"
-                }, {
-                    "args": ["v"],
-                    "op": "print"
-                }],
-                "name":
-                "main"
-            }]
-        })
+        bbprog = BBProgram(prog=parser.parse("""
+          @main() {
+            v: int = const 4;
+            jmp .somewhere;
+            v: int = const 2;
+            .somewhere:
+            print v;
+          }"""))
         defs = dataflow.reaching_defs(bbprog.funcs["main"])
         # defs[k] is the reaching defs at the end of the k^th block.
         # defs[k] is a dict mapping variable names to the set of
