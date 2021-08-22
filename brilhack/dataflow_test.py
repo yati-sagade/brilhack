@@ -3,6 +3,7 @@ from pprint import pprint
 
 from . import dataflow
 from .basic_blocks import BBProgram
+from . import parser
 
 
 class DataFlowTest(unittest.TestCase):
@@ -23,53 +24,19 @@ class DataFlowTest(unittest.TestCase):
           .end:
         }
         """
-        bbprog = BBProgram({
-            "functions": [{
-                "args": [{
-                    "name": "x",
-                    "type": "int"
-                }],
-                "instrs": [{
-                    "dest": "v",
-                    "op": "const",
-                    "type": "int",
-                    "value": 0
-                }, {
-                    "dest": "incr",
-                    "op": "const",
-                    "type": "int",
-                    "value": 1
-                }, {
-                    "label": "loop"
-                }, {
-                    "args": ["v", "x"],
-                    "dest": "end",
-                    "op": "eq",
-                    "type": "bool"
-                }, {
-                    "args": ["end"],
-                    "labels": ["end", "body"],
-                    "op": "br"
-                }, {
-                    "label": "body"
-                }, {
-                    "args": ["v"],
-                    "op": "print"
-                }, {
-                    "args": ["v", "incr"],
-                    "dest": "v",
-                    "op": "add",
-                    "type": "int"
-                }, {
-                    "labels": ["loop"],
-                    "op": "jmp"
-                }, {
-                    "label": "end"
-                }],
-                "name":
-                "main"
-            }]
-        })
+        bbprog = BBProgram(prog=parser.parse("""
+          @main(x: int) {
+            v: int = const 0;
+            incr: int = const 1;
+            .loop:
+            end: bool = eq v x;
+            br end .end .body;
+            .body:
+            print v;
+            v: int = add v incr;
+            jmp .loop;
+            .end:
+          }"""))
         defs = dataflow.reaching_defs(bbprog.funcs["main"])
         self.assertEqual(defs, [
             {

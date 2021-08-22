@@ -1,6 +1,7 @@
 import unittest
 from .basic_blocks import BBProgram
 from . import dead_code_elimination as dce
+from . import parser
 
 
 class DeadCodeEliminationTest(unittest.TestCase):
@@ -24,41 +25,15 @@ class DeadCodeEliminationTest(unittest.TestCase):
               print b;
             }
         """
-        bbprog = BBProgram({
-            "functions": [{
-                "instrs": [{
-                    "dest": "a",
-                    "op": "const",
-                    "type": "int",
-                    "value": 1
-                }, {
-                    "dest": "a",
-                    "op": "const",
-                    "type": "int",
-                    "value": 2
-                }, {
-                    "dest": "b",
-                    "op": "const",
-                    "type": "int",
-                    "value": 3
-                }, {
-                    "args": ["a", "a"],
-                    "dest": "a",
-                    "op": "add",
-                    "type": "int"
-                }, {
-                    "dest": "b",
-                    "op": "id",
-                    "args": ["a"],
-                    "type": "int",
-                }, {
-                    "args": ["b"],
-                    "op": "print"
-                }],
-                "name":
-                "main"
-            }]
-        })
+        bbprog = BBProgram(prog=parser.parse("""
+          @main {
+              a: int = const 1;
+              a: int = const 2;
+              b: int = const 3;
+              a: int = add a a;
+              b: int = id a;
+              print b;
+          }"""))
         optprog = dce.dead_code_elimination(bbprog)
         self.assertEqual(optprog.funcs['main'].blocks, [
             [{
@@ -101,36 +76,14 @@ class DeadCodeEliminationTest(unittest.TestCase):
               print d;
             }
         """
-        bbprog = BBProgram({
-            "functions": [{
-                "instrs": [{
-                    "dest": "a",
-                    "op": "const",
-                    "type": "int",
-                    "value": 1
-                }, {
-                    "dest": "b",
-                    "op": "const",
-                    "type": "int",
-                    "value": 2
-                }, {
-                    "dest": "c",
-                    "op": "const",
-                    "type": "int",
-                    "value": 3
-                }, {
-                    "args": ["c"],
-                    "dest": "d",
-                    "op": "id",
-                    "type": "int"
-                }, {
-                    "args": ["d"],
-                    "op": "print"
-                }],
-                "name":
-                "main"
-            }]
-        })
+        bbprog = BBProgram(prog=parser.parse("""
+          @main {
+            a: int = const 1;
+            b: int = const 2;
+            c: int = const 3;
+            d: int = id c;
+            print d;
+          }"""))
         optprog = dce.dead_code_elimination(bbprog)
         self.assertEqual(optprog.funcs['main'].blocks, [
             [{
@@ -167,36 +120,14 @@ class DeadCodeEliminationTest(unittest.TestCase):
               print d;
             }
         """
-        bbprog = BBProgram({
-            "functions": [{
-                "instrs": [{
-                    "dest": "a",
-                    "op": "const",
-                    "type": "int",
-                    "value": 1
-                }, {
-                    "dest": "b",
-                    "op": "const",
-                    "type": "int",
-                    "value": 2
-                }, {
-                    "dest": "c",
-                    "op": "const",
-                    "type": "int",
-                    "value": 3
-                }, {
-                    "dest": "d",
-                    "op": "const",
-                    "type": "int",
-                    "value": 4
-                }, {
-                    "args": ["d"],
-                    "op": "print"
-                }],
-                "name":
-                "main"
-            }]
-        })
+        bbprog = BBProgram(prog=parser.parse("""
+          @main {
+            a: int = const 1;
+            b: int = const 2;
+            c: int = const 3;
+            d: int = const 4;
+            print d;
+          }"""))
         optprog = dce.dead_code_elimination(bbprog)
         self.assertEqual(optprog.funcs['main'].blocks, [
             [{

@@ -2,6 +2,7 @@ import unittest
 from .basic_blocks import BBProgram
 from .global_analysis import dominators, dominator_tree, extract_natural_loops
 from .global_analysis import is_cfg_reducible, loop_invariant_code_motion
+from . import parser
 
 
 class GlobalAnalysisTest(unittest.TestCase):
@@ -47,64 +48,27 @@ class GlobalAnalysisTest(unittest.TestCase):
         self.assertFalse(is_cfg_reducible(cfg=[[1, 2], [2], [1]]))
         self.assertFalse(is_cfg_reducible(cfg=[[1, 2], [3], [3], [1]]))
 
-    def test_loop_invariant_code_motion(self):
-        bbprog = BBProgram(
-            prog={
-                "functions": [{
-                    "instrs": [{
-                        "label": "start"
-                    }, {
-                        "dest": "i",
-                        "op": "const",
-                        "type": "int",
-                        "value": 0
-                    }, {
-                        "dest": "j",
-                        "op": "const",
-                        "type": "int",
-                        "value": 1
-                    }, {
-                        "dest": "limit",
-                        "op": "const",
-                        "type": "int",
-                        "value": 10
-                    }, {
-                        "label": "loop"
-                    }, {
-                        "args": ["i", "limit"],
-                        "dest": "done",
-                        "op": "eq",
-                        "type": "bool"
-                    }, {
-                        "args": ["done"],
-                        "labels": ["exit", "iterate"],
-                        "op": "br"
-                    }, {
-                        "label": "iterate"
-                    }, {
-                        "args": ["i"],
-                        "op": "print"
-                    }, {
-                        "args": ["j", "j"],
-                        "dest": "incr",
-                        "op": "add",
-                        "type": "int"
-                    }, {
-                        "args": ["i", "incr"],
-                        "dest": "i",
-                        "op": "add",
-                        "type": "int"
-                    }, {
-                        "labels": ["loop"],
-                        "op": "jmp"
-                    }, {
-                        "label": "exit"
-                    }],
-                    "name":
-                    "main"
-                }]
-            })
+    def test_loop_invariant_code_motion1(self):
+        bbprog = BBProgram(prog=parser.parse("""
+          @main() {
+            .start:
+            i: int = const 0;
+            j: int = const 1;
+            limit: int = const 10;
 
+            .loop:
+            done: bool = eq i limit;
+            br done .exit .iterate;
+
+            .iterate:
+            print i;
+            incr: int = add j j;
+            i: int = add i incr;
+
+            jmp .loop;
+            .exit:
+          }
+        """))
         original_blocks = [
             [
                 {
